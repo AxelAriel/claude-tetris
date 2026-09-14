@@ -73,7 +73,20 @@ jobs:
 
             ## 4. Redactar el diagnóstico
             Escribe el diagnóstico **en español** en un archivo temporal (por ejemplo
-            `/tmp/triage.md`) con exactamente estas secciones:
+            `/tmp/triage.md`) con exactamente estas secciones.
+
+            El comentario debe estar escrito en **Markdown válido de GitHub (GitHub Flavored
+            Markdown)**, de forma que GitHub lo renderice correctamente:
+            - Usa `###` para los títulos de sección, tal y como aparecen abajo.
+            - Usa listas con `-` y listas numeradas con `1.` para los pasos.
+            - Usa **negrita** y `código en línea` para nombres de archivos, funciones y constantes
+              (por ejemplo `game.js:123`, `DROP_INTERVAL`).
+            - Usa bloques de código con triple backtick e indicador de lenguaje (```js, ```bash)
+              para fragmentos de código o comandos.
+            - Enlaza issues y PRs con `#numero` y usa tablas Markdown solo si aportan claridad.
+            - No escribas HTML crudo salvo el marcador oculto final.
+
+            Secciones:
 
             ### Resumen
             Una o dos frases sobre qué pide o reporta el issue.
