@@ -1,0 +1,118 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    # Skip pull requests, bot-authored events, and issues that mention @claude
+    # (those are already handled by claude.yml and would be triaged twice).
+    if: |
+      github.event.issue.pull_request == null &&
+      github.event.sender.type != 'Bot' &&
+      !contains(github.event.issue.body, '@claude') &&
+      !contains(github.event.issue.title, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # required to add labels and post/update the diagnosis comment
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Triage issue with Claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowedTools "Read,Grep,Glob,Write,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh api:*)"
+          prompt: |
+            Eres el triador automático de issues de este repositorio (Tetris en JavaScript vanilla,
+            sin build step: `index.html`, `style.css`, `game.js` con toda la lógica, `README.md`).
+
+            Trabajas sobre el issue número $ISSUE_NUMBER del repositorio $REPO.
+
+            ## 1. Leer el issue
+            Ejecuta:
+              gh issue view "$ISSUE_NUMBER" --json number,title,body,labels,comments
+
+            ## 2. Entender el proyecto
+            Lee `CLAUDE.md` y `README.md`, y después los archivos relevantes para lo que plantea el
+            issue (`game.js`, `index.html`, `style.css`). Localiza las funciones y constantes
+            concretas implicadas; las constantes ajustables están documentadas en `README.md`.
+
+            ## 3. Asignar labels
+            Elige entre 1 y 3 labels de esta lista cerrada. NO inventes ni crees labels nuevos, y NO
+            quites labels que ya estén puestos:
+              - bug                : algo no funciona como debería
+              - enhancement        : nueva funcionalidad o mejora solicitada
+              - documentation      : cambios o adiciones a la documentación
+              - question           : hace falta más información
+              - accessibility      : barrera que afecta a personas con discapacidad
+              - duplicate          : el issue ya existe
+              - good first issue   : apropiado para alguien que empieza
+              - help wanted        : necesita atención extra
+              - invalid            : no parece correcto / no es accionable
+              - wontfix            : no se va a trabajar
+
+            Aplícalos con:
+              gh issue edit "$ISSUE_NUMBER" --add-label "bug" --add-label "good first issue"
+
+            ## 4. Redactar el diagnóstico
+            Escribe el diagnóstico **en español** en un archivo temporal (por ejemplo
+            `/tmp/triage.md`) con exactamente estas secciones:
+
+            ### Resumen
+            Una o dos frases sobre qué pide o reporta el issue.
+
+            ### Tipo y labels aplicados
+            Los labels que has puesto y por qué.
+
+            ### Análisis técnico
+            Causa probable (si es un bug) o punto de partida (si es una mejora), citando archivos y
+            funciones concretas con el formato `game.js:123` y las constantes ajustables afectadas.
+
+            ### Enfoque de solución propuesto
+            Pasos concretos de implementación, respetando las restricciones de `CLAUDE.md`
+            (cero dependencias, código y strings nuevos en inglés, actualizar `README.md` si cambian
+            controles, puntuación, constantes ajustables o comportamiento del juego).
+
+            ### Riesgos y preguntas abiertas
+            Qué falta aclarar y qué podría romperse.
+
+            ### Cómo verificar
+            No hay tests ni lint: abrir el juego en el navegador y comprobar que funciona sin
+            errores de consola, más las comprobaciones específicas de este cambio.
+
+            Termina el archivo con esta línea exacta como marcador oculto:
+            <!-- claude-triage -->
+
+            ## 5. Publicar o actualizar el comentario (idempotencia)
+            Este workflow también se dispara al editar el issue, así que NO debes crear un comentario
+            nuevo si ya publicaste uno. Busca el anterior:
+
+              EXISTING=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER/comments" \
+                --jq '[.[] | select(.body | contains("<!-- claude-triage -->")) | .id] | first // empty')
+
+            - Si `EXISTING` tiene valor, actualízalo:
+                gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" -F body=@/tmp/triage.md
+            - Si está vacío, créalo:
+                gh api -X POST "repos/$REPO/issues/$ISSUE_NUMBER/comments" -F body=@/tmp/triage.md
+
+            ## Restricciones
+            - No modifiques código del repositorio, no crees ramas ni pull requests.
+            - No cierres el issue ni crees labels nuevos.
+            - Tu única salida visible es el comentario de diagnóstico y los labels aplicados.
