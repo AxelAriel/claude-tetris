@@ -86,6 +86,9 @@ Después abre `http://localhost:8000` en el navegador.
 | `Espacio` | Hard drop (caída instantánea)     |
 | `P`       | Pausar / reanudar                 |
 
+Además, el panel lateral incluye un switch **THEME** para alternar entre modo oscuro (por
+defecto) y modo claro. La preferencia se guarda en `localStorage` y se recuerda entre recargas.
+
 ---
 
 ## Cómo funciona
@@ -102,7 +105,10 @@ Define la estructura visual:
 
 ### 2. `style.css`
 
-Aporta el aspecto visual con estética _dark / retro arcade_: fondo oscuro, tipografía monoespaciada para los marcadores y _backdrop blur_ en los overlays.
+Aporta el aspecto visual con estética _retro arcade_: tipografía monoespaciada para los
+marcadores y _backdrop blur_ en los overlays. Los colores se definen como variables CSS en
+`:root` (tema oscuro, por defecto) y se sobrescriben en `body.light-theme` (tema claro), lo que
+permite alternar de tema con una sola clase en `<body>`.
 
 ### 3. `game.js`
 
@@ -117,6 +123,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
+- **Tema claro/oscuro** (`setTheme`): alterna la clase `light-theme` en `<body>`, persiste la preferencia en `localStorage` y actualiza los colores de la rejilla y el highlight de las piezas (leídos de las variables CSS `--grid-line` y `--piece-highlight`) antes de repintar el canvas.
 
 ### Flujo del juego
 
@@ -157,7 +164,7 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 ```
 03-tetris/
 ├── index.html      # Estructura del DOM y canvas
-├── style.css       # Estilos del juego (dark theme)
+├── style.css       # Estilos del juego (variables de tema oscuro/claro)
 ├── game.js         # Toda la lógica del Tetris (~300 líneas)
 └── README.md
 ```
@@ -178,6 +185,10 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
+
+Los colores del tema se ajustan en `style.css` mediante variables CSS (`--bg`, `--board-bg`,
+`--grid-line`, `--piece-highlight`, etc.) definidas en `:root` (oscuro) y sobrescritas en
+`body.light-theme` (claro).
 
 ---
 
