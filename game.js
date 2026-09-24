@@ -42,11 +42,28 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const skinSelect = document.getElementById('skin-select');
 
 const THEME_KEY = 'tetris-theme';
+const SKIN_KEY = 'tetris-skin';
+const DEFAULT_SKIN = 'retro';
+
+// Softer, desaturated palette used by the Pastel skin. Indices mirror COLORS.
+const PASTEL_COLORS = [
+  null,
+  '#a8e6f0', // I
+  '#ffe9a8', // O
+  '#dcb3e8', // T
+  '#b8e0ba', // S
+  '#f0b3b0', // Z
+  '#e8d9a3', // J
+  '#ffd6a8', // L
+  '#d8dee2', // Nut
+];
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let gridColor, pieceHighlight;
+let currentSkin = DEFAULT_SKIN;
 
 function updateThemeColors() {
   const styles = getComputedStyle(document.body);
@@ -65,9 +82,31 @@ function setTheme(isLight) {
   }
 }
 
+// Returns the color palette to use for block fills, based on the active skin.
+function skinColors() {
+  return currentSkin === 'pastel' ? PASTEL_COLORS : COLORS;
+}
+
+// Applies a visual skin (separate from the light/dark THEME toggle above).
+// Skins change block rendering (color palette, shape, glow, texture) via
+// `drawBlock`, and are persisted independently of the theme.
+function applySkin(name) {
+  currentSkin = name;
+  document.body.dataset.skin = name;
+  skinSelect.value = name;
+  localStorage.setItem(SKIN_KEY, name);
+  updateThemeColors();
+  if (board) {
+    draw();
+    drawNext();
+  }
+}
+
 themeToggle.addEventListener('change', () => setTheme(themeToggle.checked));
+skinSelect.addEventListener('change', () => applySkin(skinSelect.value));
 
 setTheme(localStorage.getItem(THEME_KEY) === 'light');
+applySkin(localStorage.getItem(SKIN_KEY) || DEFAULT_SKIN);
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -186,14 +225,61 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const color = skinColors()[colorIndex];
+  const px = x * size + 1;
+  const py = y * size + 1;
+  const w = size - 2;
   context.globalAlpha = alpha ?? 1;
+
+  if (currentSkin === 'neon') {
+    // Glow effect: a colored shadow blurred around the block's own fill.
+    context.shadowColor = color;
+    context.shadowBlur = size * 0.4;
+  }
+
   context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+  if (currentSkin === 'pastel') {
+    // Simulated rounded corners for a softer look.
+    const radius = Math.min(6, w / 3);
+    context.beginPath();
+    context.roundRect(px, py, w, w, radius);
+    context.fill();
+  } else {
+    context.fillRect(px, py, w, w);
+  }
+
+  if (currentSkin === 'neon') {
+    // Reset so the glow doesn't bleed onto later draws (grid, other blocks).
+    context.shadowBlur = 0;
+  }
+
   // highlight
   context.fillStyle = pieceHighlight;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  context.fillRect(px, py, w, 4);
+
+  if (currentSkin === 'pixel') {
+    drawPixelTexture(context, px, py, w);
+  }
+
   context.globalAlpha = 1;
+}
+
+// Draws a small checkerboard dot pattern on top of the block's base fill,
+// simulating a pixel-art texture without needing an image asset.
+function drawPixelTexture(context, px, py, w) {
+  const dot = Math.max(2, Math.floor(w / 6));
+  context.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  for (let ty = 0; ty < w; ty += dot * 2) {
+    for (let tx = 0; tx < w; tx += dot * 2) {
+      context.fillRect(px + tx, py + ty, dot, dot);
+    }
+  }
+  context.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  for (let ty = dot; ty < w; ty += dot * 2) {
+    for (let tx = dot; tx < w; tx += dot * 2) {
+      context.fillRect(px + tx, py + ty, dot, dot);
+    }
+  }
 }
 
 function drawGrid() {
