@@ -42,11 +42,27 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const bestComboEl = document.getElementById('best-combo');
+const maxLinesEl = document.getElementById('max-lines');
+const hiscoresListEl = document.getElementById('hiscores-list');
+const overlayHiscoresListEl = document.getElementById('overlay-hiscores-list');
+const resetScoresBtn = document.getElementById('reset-scores-btn');
+const nameEntry = document.getElementById('name-entry');
+const nameInput = document.getElementById('name-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
 
 const THEME_KEY = 'tetris-theme';
+const HISCORES_KEY = 'tetris-highscores';
+const STATS_KEY = 'tetris-stats';
+const MAX_HISCORES = 5;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let gridColor, pieceHighlight;
+// Combo streak: consecutive piece-locks that clear at least one line.
+let comboCounter, gameBestCombo, gameMaxLines;
+// All-time bests, persisted in localStorage.
+let bestCombo, maxLinesCleared;
+let highScores;
 
 function updateThemeColors() {
   const styles = getComputedStyle(document.body);
@@ -68,6 +84,101 @@ function setTheme(isLight) {
 themeToggle.addEventListener('change', () => setTheme(themeToggle.checked));
 
 setTheme(localStorage.getItem(THEME_KEY) === 'light');
+
+function loadStats() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STATS_KEY));
+    bestCombo = (raw && raw.bestCombo) || 0;
+    maxLinesCleared = (raw && raw.maxLinesCleared) || 0;
+  } catch {
+    bestCombo = 0;
+    maxLinesCleared = 0;
+  }
+}
+
+function saveStats() {
+  try {
+    localStorage.setItem(STATS_KEY, JSON.stringify({ bestCombo, maxLinesCleared }));
+  } catch {
+    // Storage unavailable/full: keep playing with in-memory stats only.
+  }
+}
+
+function updateStatsHUD() {
+  bestComboEl.textContent = bestCombo;
+  maxLinesEl.textContent = maxLinesCleared;
+}
+
+function loadHighScores() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISCORES_KEY));
+    highScores = Array.isArray(raw) ? raw : [];
+  } catch {
+    highScores = [];
+  }
+}
+
+function saveHighScores() {
+  try {
+    localStorage.setItem(HISCORES_KEY, JSON.stringify(highScores));
+  } catch {
+    // Storage unavailable/full: the list still works in-memory this session.
+  }
+}
+
+// Adds a new entry, keeps the list sorted descending by score, trims to
+// MAX_HISCORES, and returns the index of the newly inserted entry (or -1 if
+// it didn't make the cut).
+function addHighScore(name, finalScore, combo, linesCleared) {
+  const entry = { name, score: finalScore, combo, lines: linesCleared };
+  highScores.push(entry);
+  highScores.sort((a, b) => b.score - a.score);
+  highScores = highScores.slice(0, MAX_HISCORES);
+  saveHighScores();
+  return highScores.indexOf(entry);
+}
+
+function resetHighScores() {
+  highScores = [];
+  saveHighScores();
+  renderHighScores();
+}
+
+function renderHighScoreList(listEl, highlightIndex) {
+  listEl.innerHTML = '';
+  if (highScores.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'No scores yet';
+    listEl.appendChild(li);
+    return;
+  }
+  highScores.forEach((entry, i) => {
+    const li = document.createElement('li');
+    if (i === highlightIndex) li.className = 'highlight';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'hiscore-name';
+    nameSpan.textContent = `${i + 1}. ${entry.name}`;
+    const scoreSpan = document.createElement('span');
+    scoreSpan.textContent = entry.score.toLocaleString();
+    li.appendChild(nameSpan);
+    li.appendChild(scoreSpan);
+    listEl.appendChild(li);
+  });
+}
+
+function renderHighScores(highlightIndex) {
+  renderHighScoreList(hiscoresListEl, highlightIndex);
+  renderHighScoreList(overlayHiscoresListEl, highlightIndex);
+}
+
+function qualifiesForHighScores(candidateScore) {
+  if (candidateScore <= 0) return false;
+  if (highScores.length < MAX_HISCORES) return true;
+  return candidateScore > highScores[highScores.length - 1].score;
+}
+
+resetScoresBtn.addEventListener('click', resetHighScores);
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -135,7 +246,19 @@ function clearLines() {
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+
+    comboCounter++;
+    gameBestCombo = Math.max(gameBestCombo, comboCounter);
+    bestCombo = Math.max(bestCombo, comboCounter);
+    gameMaxLines = Math.max(gameMaxLines, cleared);
+    maxLinesCleared = Math.max(maxLinesCleared, cleared);
+    saveStats();
+    updateStatsHUD();
+
     updateHUD();
+  } else {
+    // A piece locked without clearing any lines: the combo streak breaks.
+    comboCounter = 0;
   }
 }
 
@@ -252,7 +375,29 @@ function endGame() {
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
+
+  if (qualifiesForHighScores(score)) {
+    nameEntry.classList.remove('hidden');
+    nameInput.value = '';
+    renderHighScores();
+    nameInput.focus();
+  } else {
+    nameEntry.classList.add('hidden');
+    renderHighScores();
+  }
 }
+
+function saveScore() {
+  const name = nameInput.value.trim() || 'Player';
+  const index = addHighScore(name, score, gameBestCombo, lines);
+  renderHighScores(index);
+  nameEntry.classList.add('hidden');
+}
+
+saveScoreBtn.addEventListener('click', saveScore);
+nameInput.addEventListener('keydown', e => {
+  if (e.code === 'Enter') saveScore();
+});
 
 function togglePause() {
   if (gameOver) return;
@@ -294,10 +439,16 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  comboCounter = 0;
+  gameBestCombo = 0;
+  gameMaxLines = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
+  updateStatsHUD();
+  renderHighScores();
+  nameEntry.classList.add('hidden');
   overlay.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
@@ -328,6 +479,13 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+restartBtn.addEventListener('click', () => {
+  // Don't discard an unsaved high score if the player restarts without
+  // clicking Save first.
+  if (gameOver && !nameEntry.classList.contains('hidden')) saveScore();
+  init();
+});
 
+loadStats();
+loadHighScores();
 init();

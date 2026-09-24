@@ -42,6 +42,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- **Tabla de puntuaciones altas local** (top 5, guardada en `localStorage`), con entrada de nombre al terminar la partida y seguimiento del mejor combo y del máximo de líneas eliminadas de una sola vez.
 
 ---
 
@@ -183,12 +184,21 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `COLORS`       | Paleta de colores por tipo de pieza      | 8 colores             |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
+| `MAX_HISCORES` | Cantidad de entradas en la tabla de puntuaciones altas | `5`      |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
 
 Los colores del tema se ajustan en `style.css` mediante variables CSS (`--bg`, `--board-bg`,
 `--grid-line`, `--piece-highlight`, etc.) definidas en `:root` (oscuro) y sobrescritas en
 `body.light-theme` (claro).
+
+El juego usa tres claves de `localStorage` para persistir estado entre recargas:
+
+| Clave                | Contenido                                                                 |
+| -------------------- | -------------------------------------------------------------------------- |
+| `tetris-theme`        | Tema elegido (`'light'` u oscuro por defecto).                            |
+| `tetris-highscores`   | Array JSON con hasta `MAX_HISCORES` entradas `{ name, score, combo, lines }`. |
+| `tetris-stats`        | Mejor combo y máximo de líneas eliminadas de una vez, acumulados históricamente (`{ bestCombo, maxLinesCleared }`). |
 
 ---
 
