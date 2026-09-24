@@ -41,7 +41,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Vista previa** de la siguiente pieza.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
-- **Pausa** y **Game Over** con opción de reinicio.
+- **Menú de pausa** con opciones de reanudar, reiniciar, ver controles y elegir el nivel inicial de la próxima partida, además del overlay de **Game Over** con opción de reinicio.
 
 ---
 
@@ -84,7 +84,13 @@ Después abre `http://localhost:8000` en el navegador.
 | `↑` o `X` | Rotar la pieza en sentido horario |
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
+| `P` / `Esc` | Pausar / reanudar (abre el menú de pausa) |
+
+Al pausar (con `P` o `Esc`) se abre un menú de pausa que bloquea todas las entradas del juego
+mientras está abierto y ofrece: **Resume** (reanudar), **Restart** (reiniciar la partida sin
+recargar la página), **View Controls** (mostrar la lista de controles dentro del menú) y un
+selector de **Starting level** que define en qué nivel empezará la próxima partida (solo dura
+la sesión actual, no se guarda en `localStorage`).
 
 Además, el panel lateral incluye un switch **THEME** para alternar entre modo oscuro (por
 defecto) y modo claro. La preferencia se guarda en `localStorage` y se recuerda entre recargas.
@@ -101,7 +107,8 @@ Define la estructura visual:
 
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
 - Un panel lateral con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** y **GAME OVER**.
+- Un overlay para el estado **GAME OVER** y un menú de pausa (**PAUSA**) independiente con sus
+  propias opciones (reanudar, reiniciar, ver controles, nivel inicial).
 
 ### 2. `style.css`
 
@@ -121,7 +128,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
-- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
+- **Nivel y velocidad**: el nivel sube cada 10 líneas a partir del nivel inicial elegido en el menú de pausa (`startLevel`); la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 - **Tema claro/oscuro** (`setTheme`): alterna la clase `light-theme` en `<body>`, persiste la preferencia en `localStorage` y actualiza los colores de la rejilla y el highlight de las piezas (leídos de las variables CSS `--grid-line` y `--piece-highlight`) antes de repintar el canvas.
 
@@ -182,7 +189,7 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `BLOCK`        | Tamaño en píxeles de cada celda          | `30`                  |
 | `COLORS`       | Paleta de colores por tipo de pieza      | 8 colores             |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
-| `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
+| `dropInterval` | Velocidad de caída en ms, calculada a partir del nivel inicial (`startLevel`) | `1000` (nivel 1)      |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
 
