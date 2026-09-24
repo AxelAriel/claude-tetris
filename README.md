@@ -42,6 +42,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- **Selector de skins visuales** (Retro, Neon, Pastel, Pixel Art) que cambia por completo el aspecto de los bloques sin recargar la página; independiente del switch de tema claro/oscuro y con la elección guardada en `localStorage`.
 
 ---
 
@@ -89,6 +90,10 @@ Después abre `http://localhost:8000` en el navegador.
 Además, el panel lateral incluye un switch **THEME** para alternar entre modo oscuro (por
 defecto) y modo claro. La preferencia se guarda en `localStorage` y se recuerda entre recargas.
 
+Junto al switch de tema hay un selector **SKIN** (Retro / Neon / Pastel / Pixel Art) que cambia
+el estilo visual de los bloques al instante, sin recargar la página. Es independiente del tema
+claro/oscuro y su elección también se recuerda entre recargas.
+
 ---
 
 ## Cómo funciona
@@ -124,6 +129,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 - **Tema claro/oscuro** (`setTheme`): alterna la clase `light-theme` en `<body>`, persiste la preferencia en `localStorage` y actualiza los colores de la rejilla y el highlight de las piezas (leídos de las variables CSS `--grid-line` y `--piece-highlight`) antes de repintar el canvas.
+- **Skins visuales** (`applySkin`): añade el atributo `data-skin` en `<body>` (independiente de la clase de tema anterior), persiste la elección en `localStorage` y vuelve a leer las variables CSS antes de repintar. `drawBlock` —la función de bajo nivel usada para dibujar cada bloque del tablero, la pieza fantasma y la vista previa— cambia según la skin activa: la paleta de colores (`COLORS` o la más suave `PASTEL_COLORS`), esquinas rectas o redondeadas (`context.roundRect`), un efecto de brillo (`shadowBlur`/`shadowColor`) para Neon, y una textura tipo cuadrícula (`drawPixelTexture`) para Pixel Art.
 
 ### Flujo del juego
 
@@ -189,6 +195,18 @@ Algunos parámetros fáciles de tunear en `game.js`:
 Los colores del tema se ajustan en `style.css` mediante variables CSS (`--bg`, `--board-bg`,
 `--grid-line`, `--piece-highlight`, etc.) definidas en `:root` (oscuro) y sobrescritas en
 `body.light-theme` (claro).
+
+**Skins visuales**: independientes del tema anterior.
+
+| Constante / clave      | Significado                                                    | Por defecto |
+| ----------------------- | --------------------------------------------------------------- | ----------- |
+| `SKIN_KEY`              | Clave de `localStorage` donde se guarda la skin elegida         | `'tetris-skin'` (valor por defecto `'retro'`) |
+| `PASTEL_COLORS`         | Paleta de colores suaves usada por la skin Pastel               | 8 colores   |
+
+Cada skin (`retro`, `neon`, `pastel`, `pixel`) se activa poniendo `data-skin="<nombre>"` en
+`<body>`; `style.css` sobrescribe `--board-bg`, `--grid-line` y `--piece-highlight` por skin
+(por ejemplo, `neon` fuerza un fondo negro), y `drawBlock` en `game.js` cambia el color, la
+forma y los efectos (glow, textura) según la skin activa.
 
 ---
 
